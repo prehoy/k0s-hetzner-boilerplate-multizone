@@ -1,0 +1,3 @@
+# Copy to terraform.tfvars (gitignored) and adjust.
+domain   = "example.com"
+location = "fsn1"       # primary EU DC (nodes spread fsn1/nbg1/hel1 via main.tf); eu-central: fsn1, nbg1, hel1
