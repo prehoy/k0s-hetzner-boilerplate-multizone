@@ -1,7 +1,7 @@
 # Highly available multi-zone k0s cluster boilerplate
 
 > by [@misterkuka](https://github.com/misterkuka) · multi-datacenter variant of the
-> [single-zone boilerplate](https://github.com/misterkuka)
+> [single-zone boilerplate](https://github.com/prehoy/k0s-hetzner-boilerplate)
 
 A **fully HA, multi-datacenter** Kubernetes ([k0s](https://k0sproject.io/)) cluster on
 [Hetzner Cloud](https://www.hetzner.com/cloud), provisioned end-to-end as code — **Terraform** for the
@@ -120,3 +120,69 @@ terraform apply
   → terraform/databasus apply        (optional, DB backups)
   → gitops/bootstrap/bootstrap.sh    (ArgoCD app-of-apps)
 ```
+
+## What it costs — vs managed GKE / EKS / DOKS
+
+This is the pitch. You get **managed-grade HA** — 3-node control plane, autoscaling, HA
+Postgres, HA storage, LB failover — at **self-managed prices**, because Hetzner doesn't charge
+a control-plane fee and its egress is effectively free. This repo is what automates the "self-managed"
+part away.
+
+Same cluster, four providers. On-demand, NET (ex-VAT), **730 hrs/mo**, EU regions, matched instance
+classes (RAM noted where a provider has no exact shape). Managed control planes (GKE-regional,
+EKS, DOKS-HA) bundle HA into their fee; on Hetzner you run three small controllers — priced in below.
+
+### Small · non-HA (dev/staging) — 3× 4 vCPU / 8–16 GB · 1 LB · 100 GB
+
+| | **Hetzner (this repo)** | GKE | EKS | DOKS |
+|---|--:|--:|--:|--:|
+| Monthly | **≈ $217** | $351 | $524 | $166 |
+
+> The one config where DigitalOcean's shared droplets undercut Hetzner. Fine — these are *HA*
+> boilerplates; the fight that matters is below.
+
+### Medium · HA (prod baseline, ≈ this boilerplate's shape) — HA control plane + 4× 4 vCPU / 16 GB · 2 LB · 500 GB
+
+| | **Hetzner (this repo)** | GKE | EKS | DOKS |
+|---|--:|--:|--:|--:|
+| Monthly | **≈ $529** | $590 | $808 | $618 |
+| vs Hetzner | — | +12% | **+53%** | +17% |
+
+### Large · HA — HA control plane + 8× 8 vCPU / 32 GB · 3 LB · 2 TB
+
+| | **Hetzner (this repo)** | GKE | EKS | DOKS |
+|---|--:|--:|--:|--:|
+| Monthly | **≈ $1,568** | $2,050 | $2,999 | $2,292 |
+| vs Hetzner | — | +31% | **+91%** | +46% |
+
+### …then egress makes it a rout
+
+The tables above are *before traffic*. Push **5 TB/mo** outbound — a modest API/app load — and the
+gap explodes:
+
+| | Hetzner | DOKS | GKE | EKS |
+|---|--:|--:|--:|--:|
+| Egress on 5 TB/mo | **$0** | **$0** | ≈ $600 | ≈ $450 |
+
+Hetzner includes **20 TB per server** (overage €1/TB); DigitalOcean pools a free multi-TB allotment.
+GKE bills **$0.12/GB** and EKS **$0.09/GB** — so on a busy prod cluster egress alone can cost more than
+the entire Hetzner bill.
+
+**The honest asterisk:** "managed" clusters give you a vendor-run, SLA-backed control plane. Here *you*
+own the three controllers — but Terraform + Ansible + ArgoCD in this repo stand them up and keep them
+healed, so the operational delta is small and the savings are not. Prices are list rates as of 2026
+(Hetzner post-June-2026 hike); your mileage varies with commitments/savings plans on the hyperscalers.
+Track your real bill with **[hetzner-cost-monitor](https://github.com/prehoy/hetzner-cost-monitor)**.
+
+Spreading these same nodes across three datacenters (this variant) adds **$0** — inter-DC private
+traffic inside a Hetzner network zone is free.
+
+## Related projects
+
+- **[k0s-hetzner-boilerplate](https://github.com/prehoy/k0s-hetzner-boilerplate)** — the single-zone
+  variant: same batteries-included HA stack, all in one datacenter. Simpler and slightly cheaper; use it
+  when full-DC redundancy isn't a requirement.
+- **[hetzner-cost-monitor](https://github.com/prehoy/hetzner-cost-monitor)** — a self-hostable cost
+  explorer for Hetzner Cloud (live €/hr burn, month-to-date, spend by project/type/location). Point it
+  at the same project to watch what this cluster actually costs; it deploys onto the cluster you just
+  built.
