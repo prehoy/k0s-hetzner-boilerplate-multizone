@@ -19,10 +19,9 @@ Fill them in, set your `domain`, and `terraform apply`.
 ```mermaid
 flowchart TB
   internet([Internet]) --> cf[Cloudflare DNS]
-  cf --> fip[[Floating IP · fsn1]]
 
   subgraph net["Private network 10.0.0.0/16 · eu-central (fsn1 / nbg1 / hel1)"]
-    fip --> lb["LB pair (split) · keepalived + haproxy<br/>lb-0 fsn1 · lb-1 nbg1<br/>VIP 10.0.0.240 (k8s API) fails over cross-DC"]
+    cf -->|"round-robin A · both LB IPs"| lb["LB pair (split) · keepalived + haproxy<br/>lb-0 fsn1 · lb-1 nbg1<br/>VIP 10.0.0.240 (k8s API) fails over cross-DC"]
     lb --> cp["Control plane ×3<br/>k0s controllers + etcd quorum<br/>fsn1 · nbg1 · hel1"]
     lb --> wk["Workers ×3 + autoscaler<br/>fsn1 · nbg1 · hel1"]
     cp -. schedules .-> wk
@@ -43,12 +42,12 @@ flowchart TB
                 Internet
                    │
             Cloudflare DNS
-                   │
-              Floating IP (fsn1)
+                   │  round-robin A: both LB IPs
                    │
    ┌───────────────┴──────────── private net 10.0.0.0/16 · eu-central ────┐
    │   LB pair (split): lb-0 fsn1 · lb-1 nbg1                            │
-   │   VIP 10.0.0.240 = k8s API (fails over cross-DC) · ingress = CF LB  │
+   │   VIP 10.0.0.240 = k8s API (fails over cross-DC)                    │
+   │   public ingress = round-robin A across both LB IPs                 │
    │        │                         │                                  │
    │  control plane ×3           workers ×3 ── cluster-autoscaler        │
    │  fsn1·nbg1·hel1                  fsn1·nbg1·hel1                      │
@@ -69,7 +68,7 @@ in" column points at the code.
 | Layer | SPOF removed by | Survives | Implemented in |
 |---|---|---|---|
 | **Control plane** | 3 k0s controllers + etcd quorum (one per DC) behind VIP `10.0.0.240` | 1 controller **or a whole DC** | `ansible/playbooks/k0s_main` |
-| **Ingress / API LB** | LB pair split **fsn1 + nbg1**; keepalived moves the API VIP `10.0.0.240` cross-DC; public ingress via Cloudflare LB over both LB IPs | 1 LB node **or a DC** down | `ansible/playbooks/loadbalancer`, [`docs/CLOUDFLARE-LB.md`](docs/CLOUDFLARE-LB.md) |
+| **Ingress / API LB** | LB pair split **fsn1 + nbg1**; keepalived moves the API VIP `10.0.0.240` cross-DC; public ingress = round-robin A records across both LB IPs (browser retries the live one) | 1 LB node **or a DC** down | `ansible/playbooks/loadbalancer`, `terraform/cloudflare.tf` |
 | **Workers** | 3 workers (one per DC) + Hetzner cluster-autoscaler | node loss / DC loss / load spikes | `gitops/base/cluster-autoscaler` |
 | **Storage (RWX)** | DRBD NFS pair (fsn1+nbg1), keepalived alias-IP `10.0.0.199`, diskless tiebreaker in hel1 | 1 NFS node **or DC** down | `ansible/playbooks/nfs/nfs_ha` |
 | **Database** | 3-node Patroni (one per DC), automatic failover | primary loss **or a DC** | `ansible/playbooks/postgres` |
@@ -79,15 +78,16 @@ in" column points at the code.
 | **Admin access** | WireGuard bastion (hel1) to the private net | — | `ansible/playbooks/backoffice` |
 
 > The internal API VIP `10.0.0.240` is a subnet alias IP, so keepalived moves it across DCs — the k8s
-> API is DC-fault-tolerant. Public ingress uses **Cloudflare Load Balancing** health-checking both LB
-> public IPs (fsn1 + nbg1) so a DC loss fails over inbound traffic too — see
-> [`docs/CLOUDFLARE-LB.md`](docs/CLOUDFLARE-LB.md). (Interim before CF LB is enabled: a location-bound
-> floating IP on fsn1.)
+> API is DC-fault-tolerant. Public ingress is **round-robin A records across both LB public IPs**
+> (fsn1 + nbg1) — free, 2-DC reachable, and a browser retries the other LB if one is down. For
+> production, customer-facing services that need *health-checked, instant* failover, put them behind
+> **Cloudflare Load Balancing** (template in [`docs/CLOUDFLARE-LB.md`](docs/CLOUDFLARE-LB.md) /
+> `terraform/cloudflare-lb.tf`).
 
 ## What's inside
 
 ```
-terraform/   Hetzner servers/network/volumes/floating IPs + Cloudflare DNS  (+ databasus/ for backups)
+terraform/   Hetzner servers/network/volumes/primary IPs + Cloudflare DNS  (+ databasus/ for backups)
 ansible/     k0s install, LB/keepalived, DRBD NFS, Patroni Postgres, WireGuard, node tuning
 gitops/      ArgoCD app-of-apps: sealed-secrets, traefik, nfs-provisioner, cluster-autoscaler,
              monitoring (Prometheus/Grafana/Alertmanager), hyperdx + otel logs, tetragon, keydb,

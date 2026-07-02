@@ -71,11 +71,12 @@ cd ../gitops/bootstrap
 # register the repo deploy key + install Traefik — see bootstrap/README.md
 ```
 
-## 6. Public ingress HA — Cloudflare Load Balancing
+## 6. Public ingress
 
-Once Traefik is serving, put public ingress behind Cloudflare LB so it survives a DC outage (the LB
-pair is split fsn1/nbg1; the location-bound floating IP is only an interim single-DC path). Full
-steps + Terraform: **[`CLOUDFLARE-LB.md`](CLOUDFLARE-LB.md)**.
+Cluster UIs resolve via **round-robin A records across both LB IPs** (`terraform/cloudflare.tf`,
+`local.lb_rr_hosts`) — free, 2-DC, browser-retry failover; nothing extra to do. For production,
+customer-facing services that need *health-checked, instant* failover, put those behind **Cloudflare
+Load Balancing**: **[`CLOUDFLARE-LB.md`](CLOUDFLARE-LB.md)**.
 
 ## 7. Optional — DB backups
 

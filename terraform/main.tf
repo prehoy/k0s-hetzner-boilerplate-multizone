@@ -224,12 +224,9 @@ resource "hcloud_server" "lbs" {
   }
 }
 
-resource "hcloud_floating_ip" "lb_main" {
-  type          = "ipv4"
-  name          = "lb-main"
-  home_location = "fsn1" # location-bound → pinned to lb-0 (fsn1) as interim public ingress; replaced by Cloudflare LB across both LB public IPs
-  server_id     = hcloud_server.lbs[0].id
-}
+# (No floating IP: with the LB pair split across DCs a single floating IP can't fail over, so public
+# ingress is round-robin A records across both LB public IPs — see terraform/cloudflare.tf. The
+# internal API VIP 10.0.0.240 is a subnet alias IP moved by keepalived.)
 
 
 

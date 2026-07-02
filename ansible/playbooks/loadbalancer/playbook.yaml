@@ -2,9 +2,7 @@
   hosts: lb_main
   become: true
   vars:
-    floating_ip: 203.0.113.20   # CHANGEME — your LB floating IP (interim public ingress; replaced by Cloudflare LB)
     cloud_private_network_adapter: enp7s0
-    floating_ip_name: lb-main
     # hetzner_api_token: ANSIBLE VAULT
   vars_files:
     - secrets.yml
@@ -21,38 +19,24 @@
           - jq
         state: present
 
-    - name: Check if /opt/hcloud-ip is installed
-      stat:
-        path: /opt/hcloud-ip
-      register: hcloud_ip_installed
+    # Floating IP retired — public ingress uses round-robin A records across both LB IPs (see
+    # terraform/cloudflare.tf). keepalived still owns the internal API VIP 10.0.0.240 + the NAT-HA
+    # route (failover.sh). These tasks remove the old floating-IP artifacts so a re-run leaves a
+    # clean LB.
+    - name: Remove the retired floating-IP netplan
+      file:
+        path: /etc/netplan/60-floating-ip.yaml
+        state: absent
+      register: fip_netplan
 
-    - name: Download hcloud-ip if missing
-      get_url:
-        url: https://github.com/FootprintDev/hcloud-ip/releases/download/v0.0.1/hcloud-ip-linux64
-        dest: /opt/hcloud-ip
-        mode: "0755"
-      when: not hcloud_ip_installed.stat.exists
+    - name: Re-apply netplan after removing the floating-IP config
+      command: netplan apply
+      when: fip_netplan.changed
 
-    - name: Ensure hcloud-ip is executable
+    - name: Remove the hcloud-ip helper (only moved the floating IP)
       file:
         path: /opt/hcloud-ip
-        mode: "0755"
-
-    - name: Verify Netplan Configuration file exists
-      stat:
-        path: /etc/netplan/60-floating-ip.yaml
-      register: netplan_config
-
-    - name: If file does not exist, create it
-      template:
-        src: ./templates/60-floating-ip.yaml.j2
-        dest: /etc/netplan/60-floating-ip.yaml
-        mode: "0644"
-      when: not netplan_config.stat.exists
-
-    - name: Apply Netplan Configuration
-      command: netplan apply
-      when: not netplan_config.stat.exists
+        state: absent
 
     - name: Install Keepalived
       apt:

@@ -1,14 +1,13 @@
 #!/bin/bash
-# keepalived notify: $1 = MASTER|BACKUP. On MASTER this LB takes over three things:
-#   1. the public floating IP             -> ingress HA
-#   2. the Hetzner private default route   -> egress NAT HA (route gateway = this LB)
-#   3. the control-plane alias IP 10.0.0.240 -> apiserver/konnectivity HA (haproxy here fronts the
-#      3 controllers on 6443/8132). Hetzner private IPs don't VRRP-migrate, so the alias is moved via
-#      the Cloud API (clear from the peer LB, set on self), same mechanism as the NFS VIP.
+# keepalived notify: $1 = MASTER|BACKUP. On MASTER this LB takes over two things:
+#   1. the Hetzner private default route     -> egress NAT HA (route gateway = this LB)
+#   2. the control-plane alias IP 10.0.0.240 -> apiserver HA (haproxy here fronts the 3 controllers on
+#      6443). Hetzner private IPs don't VRRP-migrate, so the alias is moved via the Cloud API (clear
+#      from the peer LB, set on self), same mechanism as the NFS VIP.
 # On BACKUP we just drop the local alias addr (the new master claims it via the API).
+# (The public floating IP was retired — public ingress is round-robin A records across both LB IPs.)
 set -u
 STATE="${1:-MASTER}"
-IP='{{ floating_ip_name }}'
 TOKEN='{{ hetzner_api_token }}'
 NET_NAME='{{ hetzner_network_name | default("mainNet") }}'
 CP_VIP='10.0.0.240'
@@ -48,16 +47,7 @@ if [ "$STATE" = "BACKUP" ]; then
 fi
 
 # ---- MASTER ----
-# 1. claim the public floating IP (ingress), retried
-n=0
-while [ $n -lt 10 ]; do
-    if [ "$(/opt/hcloud-ip -ip "$IP" -key $TOKEN)" == "Server called $HOSTNAME was found" ]; then
-        break
-    fi
-    n=$((n+1)); sleep 3
-done
-
-# 2. repoint the network default route at this LB (egress NAT gateway)
+# 1. repoint the network default route at this LB (egress NAT gateway)
 if [ -z "$NET_ID" ] || [ "$NET_ID" = "null" ]; then
     log "ERROR: could not resolve Hetzner network '$NET_NAME'"; exit 0
 fi

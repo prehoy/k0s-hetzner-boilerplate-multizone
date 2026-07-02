@@ -29,9 +29,8 @@ vrrp_instance VI_1 {
         chk_haproxy
     }
 
-    virtual_ipaddress {
-        {{floating_ip}}
-    }
+    # No virtual_ipaddress: the internal API VIP 10.0.0.240 is a Hetzner alias IP moved via the Cloud
+    # API in failover.sh (not a kernel VRRP VIP), and the public floating IP has been retired.
 
     notify_master "/etc/keepalived/failover.sh MASTER"
     notify_backup "/etc/keepalived/failover.sh BACKUP"
