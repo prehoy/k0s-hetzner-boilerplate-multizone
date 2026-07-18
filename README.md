@@ -236,6 +236,10 @@ Spreading these same nodes across three datacenters (this variant) adds **$0** �
 traffic inside a Hetzner network zone is free.
 
 
+> **Those numbers are yours to check.** If you'd rather we ran them against your actual bill and
+> cluster, that's the **[$600 audit](https://prehoy.com/services/)** — fixed scope, 4 hours, and the
+> report is yours to keep whether or not you move.
+
 ## Managed service
 
 Prefer to skip the ops entirely? We run this cluster for you — the same fully-HA stack, operated as a
@@ -252,10 +256,22 @@ server + traffic bill (at cost, shown above) **plus** a flat management fee:
 - **Infrastructure is passed through at Hetzner cost** — no markup on servers or traffic. The fee buys
   operations, not resold compute.
 - **One-time onboarding: $1,500–3,000** — cluster provisioning, migration, and handover.
-- Even fully managed, a prod HA cluster runs **~$1,477/mo all-in** (Pro tier + Medium-HA infra) — less
-  than the *unmanaged* EKS infra alone, and a fraction of a DevOps hire.
+- Fully managed, a prod HA cluster runs **~$1,477/mo all-in** (Pro tier + Medium-HA infra). The same
+  cluster is **≈$825/mo of EKS infra before anyone runs it** — and someone has to. A senior DevOps hire
+  is **~$9,000/mo** fully loaded (€86k average gross, [Glassdoor DE](https://www.glassdoor.com/Salaries/germany-senior-devops-engineer-salary-SRCH_IL.0,7_IN96_KO8,30.htm), Jan 2026, plus ~20% employer
+  contributions), which puts the honest comparison at **~$9,825/mo vs ~$1,477/mo**.
 
-**Interested?** Email [office@darka.io](mailto:office@darka.io) or open an issue.
+### Not ready to hand over production? Start with the audit.
+
+**$600, fixed scope, 4 hours.** We read your cluster and your actual cloud bill, then hand you a short
+report that ends in a number: what you pay now, what the same workload costs on Hetzner, what the
+migration would take, and what we'd flag before you attempt it.
+
+The report is yours either way — no retainer, no lock-in. If you go ahead, it's credited against
+onboarding.
+
+**[Book the audit →](https://cal.com/igor-bojczuk-xost00/devops-consulting)** ·
+[prehoy.com/services](https://prehoy.com/services/) · or open an issue.
 
 ## Related projects
 
